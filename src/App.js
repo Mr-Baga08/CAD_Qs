@@ -1,5 +1,5 @@
 // src/App.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -262,52 +262,7 @@ const App = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [startTime] = useState(Date.now());
 
-    useEffect(() => {
-      const fetchQuestions = async () => {
-        try {
-          const response = await axios.get('/api/quiz/questions');
-          setQuestions(response.data.questions);
-          setUserAnswers(Array(response.data.questions.length).fill(null));
-        } catch (err) {
-          setError('Failed to load questions');
-        }
-      };
-
-      fetchQuestions();
-    }, []);
-
-    useEffect(() => {
-      const timer = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            submitQuiz();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }, []);
-
-    const formatTime = (seconds) => {
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    };
-
-    const calculateProgress = () => {
-      const answeredCount = userAnswers.filter(answer => answer !== null).length;
-      return (answeredCount / questions.length) * 100;
-    };
-
-    const handleAnswerSelect = (questionIndex, optionIndex) => {
-      const updatedAnswers = [...userAnswers];
-      updatedAnswers[questionIndex] = optionIndex;
-      setUserAnswers(updatedAnswers);
-    };
-
-    const submitQuiz = async () => {
+    const submitQuiz = useCallback(async () => {
       if (isSubmitting) return;
       setIsSubmitting(true);
 
@@ -325,6 +280,51 @@ const App = () => {
         setError('Failed to submit quiz');
         setIsSubmitting(false);
       }
+    }, [isSubmitting, startTime, userAnswers, setError, setCurrentPage]);
+
+    useEffect(() => {
+      const fetchQuestions = async () => {
+        try {
+          const response = await axios.get('/api/quiz/questions');
+          setQuestions(response.data.questions);
+          setUserAnswers(Array(response.data.questions.length).fill(null));
+        } catch (err) {
+          setError('Failed to load questions');
+        }
+      };
+
+      fetchQuestions();
+    }, [setError]);
+
+    useEffect(() => {
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            submitQuiz();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }, [submitQuiz]);
+
+    const formatTime = (seconds) => {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    };
+
+    const calculateProgress = () => {
+      const answeredCount = userAnswers.filter(answer => answer !== null).length;
+      return (answeredCount / questions.length) * 100;
+    };
+
+    const handleAnswerSelect = (questionIndex, optionIndex) => {
+      const updatedAnswers = [...userAnswers];
+      updatedAnswers[questionIndex] = optionIndex;
+      setUserAnswers(updatedAnswers);
     };
 
     const goToQuestion = (index) => {
@@ -402,10 +402,23 @@ const App = () => {
               </button>
             ))}
           </div>
+          <div className="timer">
+            Time Remaining: {formatTime(timeLeft)}
+          </div>
         </div>
       </div>
     );
   };
+
+  // Handle logout
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('quizResult');
+    delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
+    setCurrentPage('login');
+  }, []);
 
   // Results Component
   const Results = () => {
@@ -558,7 +571,7 @@ const App = () => {
   // Admin Dashboard Component
   const AdminDashboard = () => {
     const [results, setResults] = useState([]);
-    const [feedback, setFeedback] = useState([]);
+    const [setFeedback] = useState([]);
     const [feedbackStats, setFeedbackStats] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
     const [showQuestionManager, setShowQuestionManager] = useState(false);
@@ -583,7 +596,7 @@ const App = () => {
       };
 
       fetchAdminData();
-    }, []);
+    }, [setError]);
 
     const exportResults = async () => {
       setIsExporting(true);
@@ -743,16 +756,6 @@ const App = () => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  // Handle logout
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('quizResult');
-    delete axios.defaults.headers.common['Authorization'];
-    setUser(null);
-    setCurrentPage('login');
   };
 
   // Render current page
