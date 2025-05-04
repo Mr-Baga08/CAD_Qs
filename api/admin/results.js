@@ -1,0 +1,25 @@
+// api/admin/results.js
+import connectDB from '../../lib/db';
+import QuizResult from '../../lib/models/quiz-result';
+import { authMiddleware, adminMiddleware } from '../../lib/middleware';
+
+async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  try {
+    await connectDB();
+    
+    const results = await QuizResult.find()
+      .populate('userId', 'name rollNumber email')
+      .sort({ completedAt: -1 });
+
+    res.json({ results });
+  } catch (error) {
+    console.error('Error fetching results:', error);
+    res.status(500).json({ message: 'Error fetching results' });
+  }
+}
+
+export default adminMiddleware(authMiddleware(handler));

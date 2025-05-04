@@ -1,0 +1,29 @@
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "api/**/*.js",
+        "use": "@vercel/node"
+      },
+      {
+        "src": "src/**",
+        "use": "@vercel/static-build",
+        "config": {
+          "distDir": ".next"
+        }
+      }
+    ],
+    "routes": [
+      {
+        "src": "/api/(.*)",
+        "dest": "/api/$1"
+      },
+      {
+        "src": "/(.*)",
+        "dest": "/src/index.html"
+      }
+    ],
+    "github": {
+      "silent": true
+    }
+  }
