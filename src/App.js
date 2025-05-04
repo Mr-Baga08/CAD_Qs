@@ -263,7 +263,7 @@ const App = () => {
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [userAnswers, setUserAnswers] = useState([]);
-    const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes
+    const [quizTimeLeft, setQuizTimeLeft] = useState(30 * 60); // 30 minutes
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [startTime] = useState(Date.now());
 
@@ -279,7 +279,7 @@ const App = () => {
       };
 
       fetchQuestions();
-    }, []); // No dependencies needed here - state setters don't trigger re-renders
+    }, []);
 
     const submitQuiz = useCallback(async () => {
       if (isSubmitting) return;
@@ -299,11 +299,11 @@ const App = () => {
         setError('Failed to submit quiz');
         setIsSubmitting(false);
       }
-    }, [isSubmitting, userAnswers, startTime]); // Only dependencies that can change
+    }, [isSubmitting, userAnswers, startTime]);
 
     useEffect(() => {
       const timer = setInterval(() => {
-        setTimeLeft((prev) => {
+        setQuizTimeLeft((prev) => {
           if (prev <= 1) {
             submitQuiz();
             return 0;
@@ -313,9 +313,9 @@ const App = () => {
       }, 1000);
 
       return () => clearInterval(timer);
-    }, [submitQuiz]); // Include submitQuiz since it's used in the effect
+    }, [submitQuiz]);
 
-    const formatTime = (seconds) => {
+    const formatQuizTime = (seconds) => {
       const minutes = Math.floor(seconds / 60);
       const remainingSeconds = seconds % 60;
       return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
@@ -563,7 +563,7 @@ const App = () => {
   // Admin Dashboard Component
   const AdminDashboard = () => {
     const [results, setResults] = useState([]);
-    const [feedback, setFeedback] = useState([]);
+    const [studentFeedback, setStudentFeedback] = useState([]);
     const [feedbackStats, setFeedbackStats] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
     const [showQuestionManager, setShowQuestionManager] = useState(false);
@@ -579,7 +579,7 @@ const App = () => {
           ]);
 
           setResults(resultsRes.data.results);
-          setFeedback(feedbackRes.data.feedback);
+          setStudentFeedback(feedbackRes.data.feedback);
           setFeedbackStats(feedbackRes.data.stats);
           setQuestions(questionsRes.data.questions);
         } catch (err) {
@@ -588,7 +588,7 @@ const App = () => {
       };
 
       fetchAdminData();
-    }, []); // No dependencies needed here - state setters don't trigger re-renders
+    }, []);
 
     const exportResults = async () => {
       setIsExporting(true);
@@ -744,10 +744,10 @@ const App = () => {
     );
   };
 
-  // Format time from seconds to MM:SS
-  const formatTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+  // Format time from seconds to MM:SS - moved to inside Quiz component as formatQuizTime
+  const formatTime = (quizTimeLeft) => {
+    const minutes = Math.floor(quizTimeLeft / 60);
+    const remainingSeconds = quizTimeLeft % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
