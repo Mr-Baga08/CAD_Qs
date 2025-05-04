@@ -1,7 +1,12 @@
-// src/App.js
+// client/src/App.js
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './App.css';
+
+const API_URL = process.env.REACT_APP_API_URL || '';
+
+// Configure axios defaults
+axios.defaults.baseURL = API_URL;
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('login');
@@ -41,7 +46,7 @@ const App = () => {
       setError('');
 
       try {
-        const response = await axios.post('/api/auth/login', formData);
+        const response = await axios.post('/api/login', formData);
         const { token, user } = response.data;
         
         localStorage.setItem('token', token);
@@ -70,7 +75,7 @@ const App = () => {
       }
 
       try {
-        const response = await axios.post('/api/auth/register', registerData);
+        const response = await axios.post('/api/register', registerData);
         const { token, user } = response.data;
         
         localStorage.setItem('token', token);
@@ -262,6 +267,20 @@ const App = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [startTime] = useState(Date.now());
 
+    useEffect(() => {
+      const fetchQuestions = async () => {
+        try {
+          const response = await axios.get('/api/questions');
+          setQuestions(response.data.questions);
+          setUserAnswers(Array(response.data.questions.length).fill(null));
+        } catch (err) {
+          setError('Failed to load questions');
+        }
+      };
+
+      fetchQuestions();
+    }, []); // No dependencies needed here - state setters don't trigger re-renders
+
     const submitQuiz = useCallback(async () => {
       if (isSubmitting) return;
       setIsSubmitting(true);
@@ -269,7 +288,7 @@ const App = () => {
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
       try {
-        const response = await axios.post('/api/quiz/submit', {
+        const response = await axios.post('/api/submit-quiz', {
           answers: userAnswers,
           timeSpent
         });
@@ -280,21 +299,7 @@ const App = () => {
         setError('Failed to submit quiz');
         setIsSubmitting(false);
       }
-    }, [isSubmitting, startTime, userAnswers, setError, setCurrentPage]);
-
-    useEffect(() => {
-      const fetchQuestions = async () => {
-        try {
-          const response = await axios.get('/api/quiz/questions');
-          setQuestions(response.data.questions);
-          setUserAnswers(Array(response.data.questions.length).fill(null));
-        } catch (err) {
-          setError('Failed to load questions');
-        }
-      };
-
-      fetchQuestions();
-    }, [setError]);
+    }, [isSubmitting, userAnswers, startTime]); // Only dependencies that can change
 
     useEffect(() => {
       const timer = setInterval(() => {
@@ -308,7 +313,7 @@ const App = () => {
       }, 1000);
 
       return () => clearInterval(timer);
-    }, [submitQuiz]);
+    }, [submitQuiz]); // Include submitQuiz since it's used in the effect
 
     const formatTime = (seconds) => {
       const minutes = Math.floor(seconds / 60);
@@ -402,23 +407,10 @@ const App = () => {
               </button>
             ))}
           </div>
-          <div className="timer">
-            Time Remaining: {formatTime(timeLeft)}
-          </div>
         </div>
       </div>
     );
   };
-
-  // Handle logout
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('quizResult');
-    delete axios.defaults.headers.common['Authorization'];
-    setUser(null);
-    setCurrentPage('login');
-  }, []);
 
   // Results Component
   const Results = () => {
@@ -444,7 +436,7 @@ const App = () => {
       setError('');
 
       try {
-        await axios.post('/api/feedback/submit', feedbackData);
+        await axios.post('/api/submit-feedback', feedbackData);
         setFeedbackSubmitted(true);
         
         setTimeout(() => {
@@ -571,7 +563,7 @@ const App = () => {
   // Admin Dashboard Component
   const AdminDashboard = () => {
     const [results, setResults] = useState([]);
-    const [setFeedback] = useState([]);
+    const [feedback, setFeedback] = useState([]);
     const [feedbackStats, setFeedbackStats] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
     const [showQuestionManager, setShowQuestionManager] = useState(false);
@@ -583,7 +575,7 @@ const App = () => {
           const [resultsRes, feedbackRes, questionsRes] = await Promise.all([
             axios.get('/api/admin/results'),
             axios.get('/api/admin/feedback'),
-            axios.get('/api/admin/questions/get')
+            axios.get('/api/admin/questions')
           ]);
 
           setResults(resultsRes.data.results);
@@ -596,7 +588,7 @@ const App = () => {
       };
 
       fetchAdminData();
-    }, [setError]);
+    }, []); // No dependencies needed here - state setters don't trigger re-renders
 
     const exportResults = async () => {
       setIsExporting(true);
@@ -621,6 +613,7 @@ const App = () => {
       }
     };
 
+    // Question management functions
     const importQuestions = async (e) => {
       const file = e.target.files[0];
       const reader = new FileReader();
@@ -628,10 +621,10 @@ const App = () => {
       reader.onload = async (event) => {
         try {
           const questionsData = JSON.parse(event.target.result);
-          await axios.post('/api/admin/questions/import', { questions: questionsData });
+          await axios.post('/api/admin/import-questions', { questions: questionsData });
           setMessage('Questions imported successfully');
           // Refresh questions
-          const response = await axios.get('/api/admin/questions/get');
+          const response = await axios.get('/api/admin/questions');
           setQuestions(response.data.questions);
         } catch (err) {
           setError('Failed to import questions');
@@ -756,6 +749,16 @@ const App = () => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('quizResult');
+    delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
+    setCurrentPage('login');
   };
 
   // Render current page
